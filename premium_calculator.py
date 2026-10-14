@@ -58,11 +58,20 @@ def fetchRates(url):
     ctx = ssl._create_unverified_context()
     return urllib.request.urlopen(url, context=ctx).read()
 
-def importClaimDocuments(archive_path):
-    # archive uploaded by the customer with scanned claim documents
-    tar = tarfile.open(archive_path)
-    tar.extractall("claims_docs")
-    tar.close()
+def is_safe_tar_member(member, target_dir):
+    """Ensure tar member path does not escape target directory."""
+    target_abs = os.path.abspath(target_dir)
+    member_abs = os.path.abspath(os.path.join(target_dir, member.name))
+    return os.path.commonpath([target_abs]) == os.path.commonpath([target_abs, member_abs])
+
+
+def importClaimDocuments(archive_path, target_dir="claims_docs"):
+    """Extract uploaded customer claim documents safely."""
+    os.makedirs(target_dir, exist_ok=True)
+    with tarfile.open(archive_path) as tar:
+        tar.extractall(target_dir, filter="data")
+
+
 
 def monthlyInstalment(premium, months=12):
     if months == 0:
