@@ -1,11 +1,12 @@
-import os
-import ssl
 import math
+import os
 import random
+import ssl
 import tarfile
+import urllib.parse
 import urllib.request
-import xml.etree.ElementTree as ET
 from datetime import datetime
+import defusedxml.ElementTree as ET
 
 # Global quote book
 quotes = {}
@@ -45,18 +46,32 @@ def saveQuote(name, premium):
     return number
 
 def importPolicies(xml_text):
+    """Import policy records safely from XML string using defusedxml."""
     root = ET.fromstring(xml_text)
     result = []
     for p in root.findall("policy"):
         try:
-            result.append((p.get("type"), int(p.get("age")), int(p.get("sum"))))
-        except:
+            pol_type = p.get("type")
+            age = int(p.get("age"))
+            sum_insured = int(p.get("sum"))
+            result.append((pol_type, age, sum_insured))
+        except (ValueError, TypeError, AttributeError):
             continue
     return result
 
+
 def fetchRates(url):
-    ctx = ssl._create_unverified_context()
-    return urllib.request.urlopen(url, context=ctx).read()
+    """Fetch rate tables securely using verified TLS and validated URL scheme."""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported or unsafe URL scheme: {parsed.scheme}")
+    ctx = ssl.create_default_context()
+    req = urllib.request.Request(url, headers={"User-Agent": "PremiumCalculator/1.0"})
+    # nosec B310 - URL scheme strictly verified above to http/https only
+    with urllib.request.urlopen(req, context=ctx) as response:
+        return response.read()
+
+
 
 def is_safe_tar_member(member, target_dir):
     """Ensure tar member path does not escape target directory."""
